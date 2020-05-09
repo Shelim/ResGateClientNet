@@ -15,7 +15,7 @@ each time you subscribe to any resource. As long as this token is not disposed
 you will get updates to that resource.
 
 Implementation support reconnecting on failure, and server polling (for example if you have more
-then one end-point)
+then one end-point). Registered resources survives reconnection (they will be resubscribed)
 
 Requires Newtonsoft.JSON and WebSocket.Client
 
