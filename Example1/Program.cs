@@ -11,7 +11,6 @@ namespace Example1
     {
         class Book
         {
-            public int id;
             public string title;
             public string author;
         }
@@ -41,7 +40,7 @@ namespace Example1
                         {
                             case 'a':
                             case 'A':
-                                AddBook();
+                                await AddBook(client);
                                 break;
                             case 'q':
                             case 'Q':
@@ -60,6 +59,7 @@ namespace Example1
         {
             lock (guard)
             {
+                Console.WriteLine("________________");
                 Console.WriteLine("What do you want to do next?");
                 Console.WriteLine("(A)dd book");
                 Console.WriteLine("(E)dit book");
@@ -69,7 +69,7 @@ namespace Example1
             }
         }
 
-        private static void AddBook()
+        private static async Task AddBook(Resgate.Client client)
         {
             string title, author;
             lock (guard)
@@ -79,6 +79,8 @@ namespace Example1
                 Console.WriteLine("Enter book author:");
                 author = Console.ReadLine();
             }
+
+            await client.Call("library.books", "new", new Book { title = title, author = author });
         }
 
         private static void Initial(List<Book> books)
@@ -91,7 +93,6 @@ namespace Example1
                 {
                     Console.WriteLine(book.title + " by " + book.author);
                 }
-                Console.WriteLine("________________");
                 waitForInitial.Set();
             }
         }

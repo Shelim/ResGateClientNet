@@ -9,7 +9,7 @@ namespace Resgate.Protocol
         public enum FailedReason
         {
             UnsupportedVersion,
-            VersionNegotationFailed
+            VersionNegotiationFailed
         }
         public readonly FailedReason Reason;
         

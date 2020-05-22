@@ -59,7 +59,7 @@ namespace Resgate.Protocol
                 }
                 catch (Exception ex)
                 {
-                    Settings.InvokeFailed(this, FailedEventArgs.FailedReason.VersionNegotationFailed);
+                    Settings.InvokeFailed(this, FailedEventArgs.FailedReason.VersionNegotiationFailed);
                 }
             });
         }
@@ -74,14 +74,16 @@ namespace Resgate.Protocol
             }
             else
             {
+                Packet packet = null;
                 lock (unhandledPackets)
                 {
-                    if (unhandledPackets.TryGetValue(response.Id, out var packet))
+                    if (unhandledPackets.TryGetValue(response.Id, out packet))
                     {
-                        packet.ResponseReceived(e.Msg.Text);
                         unhandledPackets.Remove(response.Id);
                     }
                 }
+                if(packet != null)
+                    packet.ResponseReceived(e.Msg.Text);
             }
         }
         public async Task<string> SendCommand(string type, string resourceId = null, string method = null, object param = null)

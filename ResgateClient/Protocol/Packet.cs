@@ -46,7 +46,7 @@ namespace Resgate.Protocol
             ResourceId = resourceId;
             Method = method;
             Params = param;
-            Handled = new ManualResetEventAsync(false);
+            Handled = new ManualResetEventAsync(false, false);
 
             var m = new StringBuilder();
             m.Append(type);

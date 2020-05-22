@@ -84,6 +84,19 @@ namespace Resgate
 
         private readonly Dictionary<string, List<JToken>> collections = new Dictionary<string, List<JToken>>();
 
+        public string GetRidFromCall(string data)
+        {
+            var parsed = JsonConvert.DeserializeObject<DataContainer>(data);
+            
+            return parsed.Result.Rid;
+        }
+        public JToken GetPayload(string data)
+        {
+            var parsed = JsonConvert.DeserializeObject<DataContainer>(data);
+
+            return parsed.Result.Payload;
+        }
+
         public void UpdateDataFromSubscription(string data)
         {
             var parsed = JsonConvert.DeserializeObject<DataContainer>(data);
@@ -506,6 +519,8 @@ namespace Resgate
 
         private class Data
         {
+            [JsonProperty("payload")] public JToken Payload;
+            [JsonProperty("rid")] public string Rid;
             [JsonProperty("models")] public Dictionary<string, Dictionary<string, JToken>> Models;
             [JsonProperty("collections")] public Dictionary<string, List<JToken>> Collections;
             [JsonProperty("errors")] public Dictionary<string, Error> Errors;

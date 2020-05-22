@@ -40,7 +40,9 @@ namespace Resgate.Base
         public async Task Send(string messageJson)
         {
             Settings.InvokeMessageSent(this, messageJson);
-            await Task.Run(() => client.Send(messageJson));
+            client.Send(messageJson);
+
+            await Task.CompletedTask;
         }
 
         public void Dispose()

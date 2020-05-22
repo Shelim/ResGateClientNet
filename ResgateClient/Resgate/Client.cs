@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Resgate.Protocol;
 using Resgate.Utility;
 
@@ -288,7 +289,7 @@ namespace Resgate
 
             for (; ; )
             {
-                lock (subscriptionModel)
+                lock (subscriptionCollection)
                 {
                     connected = isConnected;
                 }
@@ -306,6 +307,168 @@ namespace Resgate
             var data = await protocolClient.SendCommand("get", rid);
             state.UpdateDataFromGet(data);
             return state.GetCollection<T>(rid);
+        }
+        public async Task Call(string rid, string method, object param)
+        {
+            bool connected;
+
+            for (; ; )
+            {
+                lock (subscriptionModel)
+                {
+                    connected = isConnected;
+                }
+
+                if (!connected)
+                {
+                    await connectedEvent.WaitAsync();
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            var result = await protocolClient.SendCommand("call", rid, method, param);
+
+            var resultRid = state.GetRidFromCall(result);
+            state.UpdateDataFromSubscription(result);
+
+            if (!string.IsNullOrEmpty(resultRid))
+            {
+                await protocolClient.SendCommand("unsubscribe", resultRid);
+            }
+        }
+
+        public async Task<TokenModel> CallForModel<T>(string rid, string method, object param, Action<T> initial, Action<T> changed)
+        {
+            bool connected;
+
+            for (; ; )
+            {
+                lock (subscriptionModel)
+                {
+                    connected = isConnected;
+                }
+
+                if (!connected)
+                {
+                    await connectedEvent.WaitAsync();
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            var result = await protocolClient.SendCommand("call", rid, method, param);
+
+            var resultRid = state.GetRidFromCall(result);
+            if (string.IsNullOrEmpty(resultRid))
+                return null;
+
+            var token = new TokenModel(this, resultRid, data =>
+            {
+                initial?.Invoke(data.ToObject<T>());
+            }, data =>
+            {
+                changed?.Invoke(data.ToObject<T>());
+            });
+            lock (subscriptionModel)
+            {
+                subscriptionModel.Add(token, resultRid);
+            }
+
+            state.UpdateDataFromSubscription(result);
+
+            return token;
+        }
+
+        public async Task<TokenCollection> CallForCollection<T>(string rid, string method, object param, Action<List<T>> initial,
+            Action<int, T> added, Action<int, T> changed, Action<int> removed)
+        {
+            bool connected;
+
+            for (; ; )
+            {
+                lock (subscriptionCollection)
+                {
+                    connected = isConnected;
+                }
+
+                if (!connected)
+                {
+                    await connectedEvent.WaitAsync();
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            var result = await protocolClient.SendCommand("call", rid, method, param);
+
+            var resultRid = state.GetRidFromCall(result);
+            if (string.IsNullOrEmpty(resultRid))
+                return null;
+
+            var token = new TokenCollection(this, rid, (list) =>
+            {
+                initial?.Invoke(list.Select(x => x.ToObject<T>()).ToList());
+            }, (idx, data) =>
+            {
+                added?.Invoke(idx, data.ToObject<T>());
+            }, (idx, data) =>
+            {
+                changed?.Invoke(idx, data.ToObject<T>());
+            }, (idx) => { removed?.Invoke(idx); });
+
+            lock (subscriptionCollection)
+            {
+                subscriptionCollection.Add(token, resultRid);
+            }
+
+            state.UpdateDataFromSubscription(result);
+
+            return token;
+        }
+
+        public async Task<JToken> CallForRawResult(string rid, string method, object param)
+        {
+            bool connected;
+
+            for (; ; )
+            {
+                lock (subscriptionCollection)
+                {
+                    connected = isConnected;
+                }
+
+                if (!connected)
+                {
+                    await connectedEvent.WaitAsync();
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            var result = await protocolClient.SendCommand("call", rid, method, param);
+
+            return state.GetPayload(result);
+        }
+
+        public async Task<string> CallForStringResult(string rid, string method, object param)
+        {
+            var token = await CallForRawResult(rid, method, param);
+            return JsonConvert.SerializeObject(token, Formatting.None);
+        }
+
+        public async Task<T> CallForResult<T>(string rid, string method, object param)
+        {
+            var token = await CallForRawResult(rid, method, param);
+            return token.ToObject<T>();
         }
 
         private readonly Protocol.Client protocolClient;
