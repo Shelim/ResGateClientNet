@@ -84,11 +84,62 @@ namespace Resgate
 
         private readonly Dictionary<string, List<JToken>> collections = new Dictionary<string, List<JToken>>();
 
-        public void UpdateData(string data)
+        public void UpdateDataFromSubscription(string data)
         {
             var parsed = JsonConvert.DeserializeObject<DataContainer>(data);
 
             AddNewSubscriptions(parsed.Result);
+        }
+
+        /*
+        public void FireInitialStateForModel(string rid)
+        {
+            lock (initialModels)
+            {
+                if (initialModels.TryGetValue(rid, out var val))
+                {
+                    StateInitial?.Invoke(this, new StateInitialEventArgs(rid, val));
+                    initialModels.Remove(rid);
+                }
+            }
+        }
+        public void FireInitialStateForCollection(string rid)
+        {
+            lock (initialCollections)
+            {
+                if (initialCollections.TryGetValue(rid, out var val))
+                {
+                    StateColInitial?.Invoke(this, new StateColInitialEventArgs(rid, val));
+                    initialCollections.Remove(rid);
+                }
+            }
+        }
+        */
+        public void UpdateDataFromGet(string data)
+        {
+            var parsed = JsonConvert.DeserializeObject<DataContainer>(data);
+
+            AddNewData(parsed.Result);
+        }
+
+
+        public T GetModel<T>(string rid)
+        {
+            if (models.TryGetValue(rid, out var model))
+            {
+                return ResolveJToken(model).ToObject<T>();
+            }
+
+            return default(T);
+        }
+        public List<T> GetCollection<T>(string rid)
+        {
+            if (collections.TryGetValue(rid, out var collection))
+            {
+                return collection.Select(x => ResolveJToken(x).ToObject<T>()).ToList();
+            }
+
+            return new List<T>();
         }
 
         public event EventHandler<StateInitialEventArgs> StateInitial;
@@ -99,7 +150,8 @@ namespace Resgate
         public event EventHandler<StateColRemovedEventArgs> StateColRemoved;
 
         private readonly BijectiveDictionary<string, string> indirectSubscriptions = new BijectiveDictionary<string, string>();
-
+        // private readonly Dictionary<string, JToken> initialModels = new Dictionary<string, JToken>();
+        // private readonly Dictionary<string, List<JToken>> initialCollections = new Dictionary<string, List<JToken>>();
         private void AddIndirectSubscription(string parent, JToken token)
         {
             if (token.Type == JTokenType.Object)
@@ -189,6 +241,52 @@ namespace Resgate
                 ret[token.Key] = ResolveToken(token.Value, resolved);
             }
             return JToken.FromObject(ret);
+        }
+
+        private void AddNewData(Data data)
+        {
+            if (data != null)
+            {
+                if (data.Models != null)
+                {
+                    foreach (var model in data.Models)
+                    {
+                        models[model.Key] = model.Value;
+                    }
+                }
+
+                if (data.Collections != null)
+                {
+                    foreach (var collection in data.Collections)
+                    {
+                        collections[collection.Key] = collection.Value;
+                    }
+                }
+
+                /*
+                if (data.Models != null)
+                {
+                    lock (initialModels)
+                    {
+                        foreach (var model in data.Models)
+                        {
+                              initialModels[model.Key] = ResolveJToken(model.Value);
+                        }
+                    }
+                }
+
+                if (data.Collections != null)
+                {
+                    lock (initialCollections)
+                    {
+                        foreach (var collection in data.Collections)
+                        {
+                            initialCollections[collection.Key] = collection.Value.Select(ResolveJToken).ToList();
+                        }
+                    }
+                }
+                */
+            }
         }
 
         private void AddNewSubscriptions(Data data)

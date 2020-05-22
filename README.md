@@ -21,8 +21,8 @@ Requires Newtonsoft.JSON and WebSocket.Client
 
 Requires ResGate version at least 1.2.0
 
-DEMO Prequestitions:
-Run [this example](https://github.com/resgateio/resgate/tree/master/examples/book-collection)
+EXAMPLE 1.
+Run [this server app](https://github.com/resgateio/resgate/tree/master/examples/book-collection)
 
 ```csharp
 class Program
@@ -41,52 +41,96 @@ class Program
 		settings.Failed += (o, ev) =>
 		{
 			Console.WriteLine("Failed to connect due to " + ev.Reason.ToString());
+			waitForInitial.Set();
 		};
 
-		var client = new Resgate.Client(settings);
+		using (var client = new Resgate.Client(settings))
+		{
+			using (var token =
+				await client.SubscribeCollection<Book>("library.books", Initial, Added, Changed, Removed))
+			{
 
-		Console.WriteLine("Press any key to unsubscribe...");
-
-		var token = await client.SubscribeCollection<Book>("library.books", Initial, Added, Changed, Removed);
-		Console.ReadKey();
-		token.Dispose();
-
-
-		Console.WriteLine("Press any key to end...");
-		Console.ReadKey();
+				waitForInitial.WaitOne();
+				for (;;)
+				{
+					DisplayInfo();
+					var key = Console.ReadKey(true);
+					if(key.KeyChar == 'q' || key.KeyChar == 'Q')
+						return;
+				}
+			}
+		}
 	}
 
 	private static List<Book> data;
+	private static object guard = new object();
+	private static ManualResetEvent waitForInitial = new ManualResetEvent(false);
+
+	private static void DisplayInfo()
+	{
+		lock (guard)
+		{
+			Console.WriteLine("What do you want to do next?");
+			Console.WriteLine("(Q)uit");
+			Console.WriteLine("________________");
+		}
+	}
+
+	private static void AddBook()
+	{
+		string title, author;
+		lock (guard)
+		{
+			Console.WriteLine("Enter book title:");
+			title = Console.ReadLine();
+			Console.WriteLine("Enter book author:");
+			author = Console.ReadLine();
+		}
+	}
 
 	private static void Initial(List<Book> books)
 	{
-		data = books;
-		Console.WriteLine("Initial state:");
-		foreach (var book in books)
+		lock (guard)
 		{
-			Console.WriteLine(book.title + " by " + book.author);
+			data = books;
+			Console.WriteLine("Initial state:");
+			foreach (var book in books)
+			{
+				Console.WriteLine(book.title + " by " + book.author);
+			}
+			Console.WriteLine("________________");
+			waitForInitial.Set();
 		}
-		Console.WriteLine("________________");
 	}
 
 	private static void Added(int index, Book book)
 	{
-		Console.WriteLine("Added: " + book.title + " by " + book.author);
-		data.Insert(index, book);
+		lock (guard)
+		{
+			Console.WriteLine("Added: " + book.title + " by " + book.author);
+			data.Insert(index, book);
+		}
 	}
 
 	private static void Changed(int index, Book book)
 	{
-		var prev = data[index];
-		Console.WriteLine("Changed: " + prev.title  + " by " + prev.author + " into " + book.title + " by " + book.author);
-		data[index] = book;
+		lock (guard)
+		{
+			var prev = data[index];
+			Console.WriteLine("Changed: " + prev.title + " by " + prev.author + " into " + book.title + " by " +
+							  book.author);
+			data[index] = book;
+		}
 	}
 
 	private static void Removed(int index)
 	{
-		var book = data[index];
-		Console.WriteLine("Removed: " + book.title + " by " + book.author);
-		data.RemoveAt(index);
+		lock (guard)
+		{
+			var book = data[index];
+			Console.WriteLine("Removed: " + book.title + " by " + book.author);
+			data.RemoveAt(index);
+		}
 	}
 }
 ```

@@ -5,7 +5,7 @@ VisualStudioVersion = 16.0.29709.97
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ResgateClient", "ResgateClient\ResgateClient.csproj", "{0317228B-B6D3-4C41-BD9D-895B056B8160}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example", "Example\Example.csproj", "{C2CA5080-4931-4FB8-B688-6DCF706A6CD6}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Example1", "Example1\Example1.csproj", "{C2CA5080-4931-4FB8-B688-6DCF706A6CD6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

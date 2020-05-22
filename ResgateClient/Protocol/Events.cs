@@ -12,7 +12,7 @@ namespace Resgate.Protocol
             VersionNegotationFailed
         }
         public readonly FailedReason Reason;
-
+        
         public FailedEventArgs(FailedReason reason)
         {
             Reason = reason;

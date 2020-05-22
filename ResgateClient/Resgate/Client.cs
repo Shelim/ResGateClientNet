@@ -17,6 +17,8 @@ namespace Resgate
         {
             Settings = settings;
 
+            connectedEvent = new ManualResetEventAsync(false);
+
             var protocolSettings = new Protocol.Settings(settings.UriProvider, settings.ReconnectTimeout,
                 settings.ResponseTimeout);
 
@@ -104,6 +106,7 @@ namespace Resgate
         }
 
         private bool isConnected;
+        private ManualResetEventAsync connectedEvent;
 
         private void ClientFailed(object sender, FailedEventArgs e)
         {
@@ -122,17 +125,18 @@ namespace Resgate
                 lock (subscriptionCollection)
                 {
                     isConnected = true;
+                    connectedEvent.Set();
 
                     foreach (var model in subscriptionModel.Reverse())
                     {
                         var data = protocolClient.SendCommand("subscribe", model.Key).Result;
-                        state.UpdateData(data);
+                        state.UpdateDataFromSubscription(data);
                     }
 
                     foreach (var collection in subscriptionCollection.Reverse())
                     {
                         var data = protocolClient.SendCommand("subscribe", collection.Key).Result;
-                        state.UpdateData(data);
+                        state.UpdateDataFromSubscription(data);
                     }
                 }
             }
@@ -144,6 +148,7 @@ namespace Resgate
             {
                 lock (subscriptionCollection)
                 {
+                    connectedEvent.Reset();
                     isConnected = false;
                 }
             }
@@ -175,7 +180,8 @@ namespace Resgate
             if (connected)
             {
                 var data = await protocolClient.SendCommand("subscribe", rid);
-                state.UpdateData(data);
+                state.UpdateDataFromSubscription(data);
+                // state.FireInitialStateForModel(rid);
             }
 
             return token;
@@ -206,7 +212,8 @@ namespace Resgate
             if (connected)
             {
                 var data = await protocolClient.SendCommand("subscribe", rid);
-                state.UpdateData(data);
+                state.UpdateDataFromSubscription(data);
+                // state.FireInitialStateForCollection(rid);
             }
 
             return token;
@@ -247,6 +254,58 @@ namespace Resgate
                     await protocolClient.SendCommand("unsubscribe", tokenCollection.Rid);
                 });
             }
+        }
+
+        public async Task<T> GetModel<T>(string rid)
+        {
+            bool connected;
+
+            for (;;)
+            {
+                lock (subscriptionModel)
+                {
+                    connected = isConnected;
+                }
+
+                if (!connected)
+                {
+                    await connectedEvent.WaitAsync();
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            var data = await protocolClient.SendCommand("get", rid);
+            state.UpdateDataFromGet(data);
+            return state.GetModel<T>(rid);
+        }
+
+        public async Task<List<T>> GetCollection<T>(string rid)
+        {
+            bool connected;
+
+            for (; ; )
+            {
+                lock (subscriptionModel)
+                {
+                    connected = isConnected;
+                }
+
+                if (!connected)
+                {
+                    await connectedEvent.WaitAsync();
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            var data = await protocolClient.SendCommand("get", rid);
+            state.UpdateDataFromGet(data);
+            return state.GetCollection<T>(rid);
         }
 
         private readonly Protocol.Client protocolClient;
