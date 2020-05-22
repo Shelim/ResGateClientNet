@@ -54,7 +54,7 @@ var settings = new Resgate.Settings(() => new Uri("ws://localhost:8080"));
 
 settings.Failed += (o, ev) =>
 {
-	Console.WriteLine("Failed to connect due to " + ev.Reason.ToString());
+    Console.WriteLine("Failed to connect due to " + ev.Reason.ToString());
 }
 
 // Define class that will hold our data. You can have subobjects, and they will
@@ -62,105 +62,105 @@ settings.Failed += (o, ev) =>
 // are supported too!
 class Book
 {
-	public string title;
-	public string author;
+    public string title;
+    public string author;
 }
 
 // Create actual client
 using (var client = new Resgate.Client(settings))
 {
-	// Get some basic data (non-subscribed version)
-	// Important: this will block waiting for reconnection if currently disconnected
+    // Get some basic data (non-subscribed version)
+    // Important: this will block waiting for reconnection if currently disconnected
     List<Book> data = await client.GetCollection<Book>("library.books");
-	Book book = await client.GetModel<Book>("library.book.1");
-	
-	
-	// Now for the wunderwaffe - collection (or model) that will automatically update
-	// if server updates the resources. Definition for Initial, Addded, Changed, Removed below
-	TokenCollection token1 = await client.SubscribeCollection<Book>
-										("library.books", Initial, Added, Changed, Removed)
-	
-	// as long as token remains alive, the four methods can be called
-	// (Initial is guaranteed, others may follow)
-	
-	// Do some stuff...
-	token1.Dispose(); // Stop listening for collections
-	
-	
-	
-	// Now for the models themselves. For reference I will show how to pass custom args:
-	TokenModel token2 = await client.SubscribeModel<Book>(
-							"library.book.1", InitialModel, book => { ChangedModel(1, book); });
-	
-	// Do some stuff...
-	token2.Dispose(); // Stop listening for model changes
-	
-	
-	// Let us call a server command (for example adding new resource).
-	// Note that Resgate allows call to return subscribed resource. Therefore strong care must be taken
-	// (with Back-End guy) to get the correct call type.
-	
-	// First, simple call that will ignore the result
-	await client.Call("library.books", "new", new Book { title = "Earthsea", author = "Ursula LeGuin" });
-	
-	// Next call, that can actually subscribe result as model (for example you expect it will return created object)
-	TokenModel token3 = await client.CallForModel<Book>("library.books", "add",
-		new Book { title = "Earthsea", author = "Ursula LeGuin" } InitialModel, book => { ChangedModel(1, book); });
-		
-	// And analogous for collections:
-	TokenCollection token4 = await client.CallForCollection<Book>("library.books", "get_some",
-							new[] { "param", "foobar" }, Initial, Added, Changed, Removed);
-							
-	// And some last ones for custom payloads:
-	JToken payload = await client.CallForRawResult("library.books", "method", new[] { "Sample" } );
-	
-	// The same, but payload as serialized JSON string:
-	string payloadStr = await client.CallForStringResult("library.books", "method", new[] { "Sample" } );
-	
-	// The same, but payload as deserialized object:
-	Book payloadBook = await client.CallForResult<Book>("library.books", "method", new[] { "Sample" } );
+    Book book = await client.GetModel<Book>("library.book.1");
+    
+    
+    // Now for the wunderwaffe - collection (or model) that will automatically update
+    // if server updates the resources. Definition for Initial, Addded, Changed, Removed below
+    TokenCollection token1 = await client.SubscribeCollection<Book>
+                           ("library.books", Initial, Added, Changed, Removed)
+    
+    // as long as token remains alive, the four methods can be called
+    // (Initial is guaranteed, others may follow)
+    
+    // Do some stuff...
+    token1.Dispose(); // Stop listening for collections
+    
+    
+    
+    // Now for the models themselves. For reference I will show how to pass custom args:
+    TokenModel token2 = await client.SubscribeModel<Book>(
+                  "library.book.1", InitialModel, book => { ChangedModel(1, book); });
+    
+    // Do some stuff...
+    token2.Dispose(); // Stop listening for model changes
+    
+    
+    // Let us call a server command (for example adding new resource).
+    // Note that Resgate allows call to return subscribed resource. Therefore strong care must be taken
+    // (with Back-End guy) to get the correct call type.
+    
+    // First, simple call that will ignore the result
+    await client.Call("library.books", "new", new Book { title = "Earthsea", author = "Ursula LeGuin" });
+    
+    // Next call, that can actually subscribe result as model (for example you expect it will return created object)
+    TokenModel token3 = await client.CallForModel<Book>("library.books", "add",
+         new Book { title = "Earthsea", author = "Ursula LeGuin" } InitialModel, book => { ChangedModel(1, book); });
+        
+    // And analogous for collections:
+    TokenCollection token4 = await client.CallForCollection<Book>("library.books", "get_some",
+                           new[] { "param", "foobar" }, Initial, Added, Changed, Removed);
+                            
+    // And some last ones for custom payloads:
+    JToken payload = await client.CallForRawResult("library.books", "method", new[] { "Sample" } );
+    
+    // The same, but payload as serialized JSON string:
+    string payloadStr = await client.CallForStringResult("library.books", "method", new[] { "Sample" } );
+    
+    // The same, but payload as deserialized object:
+    Book payloadBook = await client.CallForResult<Book>("library.books", "method", new[] { "Sample" } );
 }
 
 List<Book> data;
 
 void Initial(List<Book> books)
 {
-	data = books;
-	Console.WriteLine("Initial state:");
-	foreach (var book in books)
-	{
-		Console.WriteLine(book.title + " by " + book.author);
-	}
+    data = books;
+    Console.WriteLine("Initial state:");
+    foreach (var book in books)
+    {
+        Console.WriteLine(book.title + " by " + book.author);
+    }
 }
 
 void Added(int index, Book book)
 {
-	Console.WriteLine("Added: " + book.title + " by " + book.author);
-	data.Insert(index, book);
+    Console.WriteLine("Added: " + book.title + " by " + book.author);
+    data.Insert(index, book);
 }
 
 void Changed(int index, Book book)
 {
-	var prev = data[index];
-	Console.WriteLine("Changed: " + prev.title + " by " + prev.author + " into " + book.title + " by " +
-					  book.author);
-	data[index] = book;
+    var prev = data[index];
+    Console.WriteLine("Changed: " + prev.title + " by " + prev.author + " into " + book.title + " by " +
+                      book.author);
+    data[index] = book;
 }
 
 void Removed(int index)
 {
-	var book = data[index];
-	Console.WriteLine("Removed: " + book.title + " by " + book.author);
-	data.RemoveAt(index);
+    var book = data[index];
+    Console.WriteLine("Removed: " + book.title + " by " + book.author);
+    data.RemoveAt(index);
 }
 
 void InitialModel(Book book)
 {
-	Console.WriteLine("Initial state of this book is: " + book.title + " by " + book.author);
+    Console.WriteLine("Initial state of this book is: " + book.title + " by " + book.author);
 }
 
 void ChangedModel(int item, Book book)
 {
-	Console.WriteLine("Book " + item + " changed to: " + book.title + " by " + book.author);
+    Console.WriteLine("Book " + item + " changed to: " + book.title + " by " + book.author);
 }
 ```
