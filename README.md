@@ -30,10 +30,10 @@ Last updated: May, 22nd, 2020
 
 ### ToDo
 
- - [x] Support for reconnection on failure
- - [x] Get methods
- - [x] Subscribe and unsubscribe methods
- - [x] Call methods
+ - [x] ~~Support for reconnection on failure~~
+ - [x] ~~Get methods~~
+ - [x] ~~Subscribe and unsubscribe methods~~
+ - [x] ~~Call methods~~
  - [ ] Auth methods
  - [ ] First release on nugets
 
