@@ -76,18 +76,6 @@ class Program
 		}
 	}
 
-	private static void AddBook()
-	{
-		string title, author;
-		lock (guard)
-		{
-			Console.WriteLine("Enter book title:");
-			title = Console.ReadLine();
-			Console.WriteLine("Enter book author:");
-			author = Console.ReadLine();
-		}
-	}
-
 	private static void Initial(List<Book> books)
 	{
 		lock (guard)
