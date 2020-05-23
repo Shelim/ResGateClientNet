@@ -155,8 +155,11 @@ namespace Resgate
             }
         }
 
+        private bool isDisposed = false;
+
         public void Dispose()
         {
+            isDisposed = true;
             protocolClient.Dispose();
         }
 
@@ -271,6 +274,11 @@ namespace Resgate
                         connected = isConnected;
                     }
 
+                    if (isDisposed)
+                    {
+                        throw new Exception("Client disposed");
+                    }
+
                     if (!connected)
                     {
                         await connectedEvent.WaitAsync();
@@ -306,6 +314,11 @@ namespace Resgate
                     lock (subscriptionCollection)
                     {
                         connected = isConnected;
+                    }
+
+                    if (isDisposed)
+                    {
+                        throw new Exception("Client disposed");
                     }
 
                     if (!connected)
@@ -345,6 +358,11 @@ namespace Resgate
                     lock (subscriptionModel)
                     {
                         connected = isConnected;
+                    }
+
+                    if (isDisposed)
+                    {
+                        throw new Exception("Client disposed");
                     }
 
                     if (!connected)
@@ -389,6 +407,11 @@ namespace Resgate
                     lock (subscriptionModel)
                     {
                         connected = isConnected;
+                    }
+
+                    if (isDisposed)
+                    {
+                        throw new Exception("Client disposed");
                     }
 
                     if (!connected)
@@ -444,6 +467,11 @@ namespace Resgate
                     lock (subscriptionCollection)
                     {
                         connected = isConnected;
+                    }
+
+                    if (isDisposed)
+                    {
+                        throw new Exception("Client disposed");
                     }
 
                     if (!connected)
@@ -502,6 +530,11 @@ namespace Resgate
                     lock (subscriptionCollection)
                     {
                         connected = isConnected;
+                    }
+
+                    if (isDisposed)
+                    {
+                        throw new Exception("Client disposed");
                     }
 
                     if (!connected)
