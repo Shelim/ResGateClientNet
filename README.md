@@ -112,13 +112,13 @@ using (var client = new Resgate.Client(settings))
                            new[] { "param", "foobar" }, Initial, Added, Changed, Removed);
                             
     // And some last ones for custom payloads:
-    JToken payload = await client.CallForRawResult("library.books", "method", new[] { "Sample" } );
+    JToken payload = await client.CallForRawPayload("library.books", "method", new[] { "Sample" } );
     
     // The same, but payload as serialized JSON string:
-    string payloadStr = await client.CallForStringResult("library.books", "method", new[] { "Sample" } );
+    string payloadStr = await client.CallForStringPayload("library.books", "method", new[] { "Sample" } );
     
     // The same, but payload as deserialized object:
-    Book payloadBook = await client.CallForResult<Book>("library.books", "method", new[] { "Sample" } );
+    Book payloadBook = await client.CallForPayload<Book>("library.books", "method", new[] { "Sample" } );
 }
 
 List<Book> data;

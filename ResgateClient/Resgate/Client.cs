@@ -260,25 +260,35 @@ namespace Resgate
         public async Task<T> GetModel<T>(string rid)
         {
             bool connected;
+            string data;
 
             for (;;)
             {
-                lock (subscriptionModel)
+                for (; ; )
                 {
-                    connected = isConnected;
-                }
+                    lock (subscriptionModel)
+                    {
+                        connected = isConnected;
+                    }
 
-                if (!connected)
-                {
-                    await connectedEvent.WaitAsync();
+                    if (!connected)
+                    {
+                        await connectedEvent.WaitAsync();
+                    }
+                    else
+                    {
+                        break;
+                    }
                 }
-                else
+                try
                 {
+                    data = await protocolClient.SendCommand("get", rid);
                     break;
                 }
+                catch (Exception)
+                {
+                }
             }
-
-            var data = await protocolClient.SendCommand("get", rid);
             state.UpdateDataFromGet(data);
             return state.GetModel<T>(rid);
         }
@@ -286,50 +296,76 @@ namespace Resgate
         public async Task<List<T>> GetCollection<T>(string rid)
         {
             bool connected;
+            string data;
 
-            for (; ; )
+            for (;;)
             {
-                lock (subscriptionCollection)
+
+                for (;;)
                 {
-                    connected = isConnected;
+                    lock (subscriptionCollection)
+                    {
+                        connected = isConnected;
+                    }
+
+                    if (!connected)
+                    {
+                        await connectedEvent.WaitAsync();
+                    }
+                    else
+                    {
+                        break;
+                    }
                 }
 
-                if (!connected)
+                try
                 {
-                    await connectedEvent.WaitAsync();
-                }
-                else
-                {
+                    data = await protocolClient.SendCommand("get", rid);
                     break;
+                }
+                catch (Exception)
+                {
                 }
             }
 
-            var data = await protocolClient.SendCommand("get", rid);
             state.UpdateDataFromGet(data);
             return state.GetCollection<T>(rid);
         }
         public async Task Call(string rid, string method, object param)
         {
             bool connected;
+            string result;
 
-            for (; ; )
+            for (;;)
             {
-                lock (subscriptionModel)
+
+
+                for (;;)
                 {
-                    connected = isConnected;
+                    lock (subscriptionModel)
+                    {
+                        connected = isConnected;
+                    }
+
+                    if (!connected)
+                    {
+                        await connectedEvent.WaitAsync();
+                    }
+                    else
+                    {
+                        break;
+                    }
                 }
 
-                if (!connected)
+                try
                 {
-                    await connectedEvent.WaitAsync();
-                }
-                else
-                {
+                    result = await protocolClient.SendCommand("call", rid, method, param);
                     break;
                 }
+                catch (Exception)
+                {
+                }
             }
-
-            var result = await protocolClient.SendCommand("call", rid, method, param);
 
             var resultRid = state.GetRidFromCall(result);
             state.UpdateDataFromSubscription(result);
@@ -343,25 +379,35 @@ namespace Resgate
         public async Task<TokenModel> CallForModel<T>(string rid, string method, object param, Action<T> initial, Action<T> changed)
         {
             bool connected;
+            string result;
 
             for (; ; )
             {
-                lock (subscriptionModel)
+
+                for (; ; )
                 {
-                    connected = isConnected;
+                    lock (subscriptionModel)
+                    {
+                        connected = isConnected;
+                    }
+
+                    if (!connected)
+                    {
+                        await connectedEvent.WaitAsync();
+                    }
+                    else
+                    {
+                        break;
+                    }
                 }
 
-                if (!connected)
+                try
                 {
-                    await connectedEvent.WaitAsync();
-                }
-                else
-                {
+                    result = await protocolClient.SendCommand("call", rid, method, param);
                     break;
                 }
+                catch (Exception) { }
             }
-
-            var result = await protocolClient.SendCommand("call", rid, method, param);
 
             var resultRid = state.GetRidFromCall(result);
             if (string.IsNullOrEmpty(resultRid))
@@ -388,25 +434,35 @@ namespace Resgate
             Action<int, T> added, Action<int, T> changed, Action<int> removed)
         {
             bool connected;
+            string result;
 
-            for (; ; )
+            for(; ; )
             {
-                lock (subscriptionCollection)
+
+                for (; ; )
                 {
-                    connected = isConnected;
+                    lock (subscriptionCollection)
+                    {
+                        connected = isConnected;
+                    }
+
+                    if (!connected)
+                    {
+                        await connectedEvent.WaitAsync();
+                    }
+                    else
+                    {
+                        break;
+                    }
                 }
 
-                if (!connected)
+                try
                 {
-                    await connectedEvent.WaitAsync();
-                }
-                else
-                {
+                    result = await protocolClient.SendCommand("call", rid, method, param);
                     break;
                 }
+                catch (Exception) { }
             }
-
-            var result = await protocolClient.SendCommand("call", rid, method, param);
 
             var resultRid = state.GetRidFromCall(result);
             if (string.IsNullOrEmpty(resultRid))
@@ -433,41 +489,50 @@ namespace Resgate
             return token;
         }
 
-        public async Task<JToken> CallForRawResult(string rid, string method, object param)
+        public async Task<JToken> CallForRawPayload(string rid, string method, object param)
         {
             bool connected;
+            string result;
 
-            for (; ; )
+            for (;;)
             {
-                lock (subscriptionCollection)
-                {
-                    connected = isConnected;
-                }
 
-                if (!connected)
+                for (;;)
                 {
-                    await connectedEvent.WaitAsync();
+                    lock (subscriptionCollection)
+                    {
+                        connected = isConnected;
+                    }
+
+                    if (!connected)
+                    {
+                        await connectedEvent.WaitAsync();
+                    }
+                    else
+                    {
+                        break;
+                    }
                 }
-                else
+                try
                 {
+                    result = await protocolClient.SendCommand("call", rid, method, param);
                     break;
                 }
+                catch (Exception) { }
             }
-
-            var result = await protocolClient.SendCommand("call", rid, method, param);
 
             return state.GetPayload(result);
         }
 
-        public async Task<string> CallForStringResult(string rid, string method, object param)
+        public async Task<string> CallForStringPayload(string rid, string method, object param)
         {
-            var token = await CallForRawResult(rid, method, param);
+            var token = await CallForRawPayload(rid, method, param);
             return JsonConvert.SerializeObject(token, Formatting.None);
         }
 
-        public async Task<T> CallForResult<T>(string rid, string method, object param)
+        public async Task<T> CallForPayload<T>(string rid, string method, object param)
         {
-            var token = await CallForRawResult(rid, method, param);
+            var token = await CallForRawPayload(rid, method, param);
             return token.ToObject<T>();
         }
 
