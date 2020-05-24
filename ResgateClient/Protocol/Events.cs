@@ -1,9 +1,21 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using Resgate.Resgate;
 
 namespace Resgate.Protocol
 {
+    public sealed class ErrorEventArgs : EventArgs
+    {
+        public readonly string Rid;
+        public readonly ErrorException Error;
+
+        public ErrorEventArgs(string rid, ErrorException error)
+        {
+            Rid = rid;
+            Error = error;
+        }
+    }
     public sealed class FailedEventArgs : EventArgs
     {
         public enum FailedReason

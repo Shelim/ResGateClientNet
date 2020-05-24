@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Resgate.Protocol;
+using Resgate.Resgate;
 using Resgate.Utility;
 
 namespace Resgate
@@ -14,6 +15,7 @@ namespace Resgate
     public sealed class Client : IDisposable
     {
         public readonly Settings Settings;
+
         public Client(Settings settings)
         {
             Settings = settings;
@@ -86,7 +88,7 @@ namespace Resgate
 
         private void StateOnStateChanged(object sender, StateChangedEventArgs e)
         {
-            if(subscriptionModel.TryGetReverse(e.Rid, out var models))
+            if (subscriptionModel.TryGetReverse(e.Rid, out var models))
             {
                 foreach (var model in models)
                 {
@@ -108,6 +110,7 @@ namespace Resgate
 
         private bool isConnected;
         private ManualResetEventAsync connectedEvent;
+        private readonly List<TokenReconnected> tokens = new List<TokenReconnected>();
 
         private void ClientFailed(object sender, FailedEventArgs e)
         {
@@ -128,16 +131,43 @@ namespace Resgate
                     isConnected = true;
                     connectedEvent.Set();
 
+                    lock (tokens)
+                    {
+                        foreach (var token in tokens)
+                        {
+                            Task.Run(async() =>
+                            {
+                                await token.Reconnected?.Invoke();
+                            }).Wait();
+                        }
+                    }
+
                     foreach (var model in subscriptionModel.Reverse())
                     {
-                        var data = protocolClient.SendCommand("subscribe", model.Key).Result;
-                        state.UpdateDataFromSubscription(data);
+                        try
+                        {
+                            var data = protocolClient.SendCommand("subscribe", model.Key).Result;
+                            state.CheckForErrors(data);
+                            state.UpdateDataFromSubscription(data);
+                        }
+                        catch (ErrorException error)
+                        {
+                            Settings.InvokeError(this, model.Key, error);
+                        }
                     }
 
                     foreach (var collection in subscriptionCollection.Reverse())
                     {
-                        var data = protocolClient.SendCommand("subscribe", collection.Key).Result;
-                        state.UpdateDataFromSubscription(data);
+                        try
+                        {
+                            var data = protocolClient.SendCommand("subscribe", collection.Key).Result;
+                            state.CheckForErrors(data);
+                            state.UpdateDataFromSubscription(data);
+                        }
+                        catch (ErrorException error)
+                        {
+                            Settings.InvokeError(this, collection.Key, error);
+                        }
                     }
                 }
             }
@@ -181,12 +211,50 @@ namespace Resgate
                 connected = isConnected;
             }
 
-            if (connected)
+            try
             {
-                var data = await protocolClient.SendCommand("subscribe", rid);
-                state.UpdateDataFromSubscription(data);
-                // state.FireInitialStateForModel(rid);
+                if (connected)
+                {
+                    var data = await protocolClient.SendCommand("subscribe", rid);
+                    state.CheckForErrors(data);
+                    state.UpdateDataFromSubscription(data);
+                    // state.FireInitialStateForModel(rid);
+                }
             }
+            catch (ErrorException error)
+            {
+                Settings.InvokeError(this, rid, error);
+            }
+
+
+            return token;
+        }
+
+        public async Task<TokenReconnected> AuthAction(Func<Task> initial, Func<Task> reauth)
+        {
+            var token = new TokenReconnected(this, reauth);
+
+            lock (tokens)
+            {
+                tokens.Add(token);
+            }
+
+            await initial?.Invoke();
+
+            return token;
+        }
+
+        public async Task<TokenReconnected> AuthAction(Func<Task> auth, bool callNow = true)
+        {
+            var token = new TokenReconnected(this, auth);
+
+            lock (tokens)
+            {
+                tokens.Add(token);
+            }
+
+            if(callNow)
+                await auth?.Invoke();
 
             return token;
         }
@@ -213,11 +281,19 @@ namespace Resgate
                 connected = isConnected;
             }
 
-            if (connected)
+            try
             {
-                var data = await protocolClient.SendCommand("subscribe", rid);
-                state.UpdateDataFromSubscription(data);
-                // state.FireInitialStateForCollection(rid);
+                if (connected)
+                {
+                    var data = await protocolClient.SendCommand("subscribe", rid);
+                    state.CheckForErrors(data);
+                    state.UpdateDataFromSubscription(data);
+                    // state.FireInitialStateForCollection(rid);
+                }
+            }
+            catch (ErrorException error)
+            {
+                Settings.InvokeError(this, rid, error);
             }
 
             return token;
@@ -260,6 +336,14 @@ namespace Resgate
             }
         }
 
+        internal void UnsubscribeToken(TokenReconnected tokenModel)
+        {
+            lock (tokens)
+            {
+                tokens.Remove(tokenModel);
+            }
+        }
+
         public async Task<T> GetModel<T>(string rid)
         {
             bool connected;
@@ -297,6 +381,7 @@ namespace Resgate
                 {
                 }
             }
+            state.CheckForErrors(data);
             state.UpdateDataFromGet(data);
             return state.GetModel<T>(rid);
         }
@@ -340,67 +425,18 @@ namespace Resgate
                 {
                 }
             }
+            state.CheckForErrors(data);
 
             state.UpdateDataFromGet(data);
             return state.GetCollection<T>(rid);
         }
-        public async Task Call(string rid, string method, object param)
+        private async Task<string> Execute(string cmd, string rid, string method, object param)
         {
             bool connected;
-            string result;
-
-            for (;;)
-            {
-
-
-                for (;;)
-                {
-                    lock (subscriptionModel)
-                    {
-                        connected = isConnected;
-                    }
-
-                    if (isDisposed)
-                    {
-                        throw new Exception("Client disposed");
-                    }
-
-                    if (!connected)
-                    {
-                        await connectedEvent.WaitAsync();
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-
-                try
-                {
-                    result = await protocolClient.SendCommand("call", rid, method, param);
-                    break;
-                }
-                catch (Exception)
-                {
-                }
-            }
-
-            var resultRid = state.GetRidFromCall(result);
-            state.UpdateDataFromSubscription(result);
-
-            if (!string.IsNullOrEmpty(resultRid))
-            {
-                await protocolClient.SendCommand("unsubscribe", resultRid);
-            }
-        }
-
-        public async Task<TokenModel> CallForModel<T>(string rid, string method, object param, Action<T> initial, Action<T> changed)
-        {
-            bool connected;
-            string result;
 
             for (; ; )
             {
+
 
                 for (; ; )
                 {
@@ -426,13 +462,32 @@ namespace Resgate
 
                 try
                 {
-                    result = await protocolClient.SendCommand("call", rid, method, param);
-                    break;
+                    return await protocolClient.SendCommand(cmd, rid, method, param);
                 }
-                catch (Exception) { }
+                catch (Exception)
+                {
+                }
             }
+        }
+        public async Task Call(string rid, string method, object param)
+        {
+            var result = await Execute("call", rid, method, param);
+            state.CheckForErrors(result);
+            var resultRid = state.GetRidFromCmd(result);
+            state.UpdateDataFromSubscription(result);
 
-            var resultRid = state.GetRidFromCall(result);
+            if (!string.IsNullOrEmpty(resultRid))
+            {
+                await protocolClient.SendCommand("unsubscribe", resultRid);
+            }
+        }
+
+        public async Task<TokenModel> CallForModel<T>(string rid, string method, object param, Action<T> initial, Action<T> changed)
+        {
+            var result = await Execute("call", rid, method, param);
+            state.CheckForErrors(result);
+
+            var resultRid = state.GetRidFromCmd(result);
             if (string.IsNullOrEmpty(resultRid))
                 return null;
 
@@ -456,43 +511,10 @@ namespace Resgate
         public async Task<TokenCollection> CallForCollection<T>(string rid, string method, object param, Action<List<T>> initial,
             Action<int, T> added, Action<int, T> changed, Action<int> removed)
         {
-            bool connected;
-            string result;
+            var result = await Execute("call", rid, method, param);
+            state.CheckForErrors(result);
 
-            for(; ; )
-            {
-
-                for (; ; )
-                {
-                    lock (subscriptionCollection)
-                    {
-                        connected = isConnected;
-                    }
-
-                    if (isDisposed)
-                    {
-                        throw new Exception("Client disposed");
-                    }
-
-                    if (!connected)
-                    {
-                        await connectedEvent.WaitAsync();
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-
-                try
-                {
-                    result = await protocolClient.SendCommand("call", rid, method, param);
-                    break;
-                }
-                catch (Exception) { }
-            }
-
-            var resultRid = state.GetRidFromCall(result);
+            var resultRid = state.GetRidFromCmd(result);
             if (string.IsNullOrEmpty(resultRid))
                 return null;
 
@@ -519,40 +541,8 @@ namespace Resgate
 
         public async Task<JToken> CallForRawPayload(string rid, string method, object param)
         {
-            bool connected;
-            string result;
-
-            for (;;)
-            {
-
-                for (;;)
-                {
-                    lock (subscriptionCollection)
-                    {
-                        connected = isConnected;
-                    }
-
-                    if (isDisposed)
-                    {
-                        throw new Exception("Client disposed");
-                    }
-
-                    if (!connected)
-                    {
-                        await connectedEvent.WaitAsync();
-                    }
-                    else
-                    {
-                        break;
-                    }
-                }
-                try
-                {
-                    result = await protocolClient.SendCommand("call", rid, method, param);
-                    break;
-                }
-                catch (Exception) { }
-            }
+            var result = await Execute("call", rid, method, param);
+            state.CheckForErrors(result);
 
             return state.GetPayload(result);
         }
@@ -566,6 +556,95 @@ namespace Resgate
         public async Task<T> CallForPayload<T>(string rid, string method, object param)
         {
             var token = await CallForRawPayload(rid, method, param);
+            return token.ToObject<T>();
+        }
+
+        public async Task Auth(string rid, string method, object param)
+        {
+            var result = await Execute("auth", rid, method, param);
+            state.CheckForErrors(result);
+            var resultRid = state.GetRidFromCmd(result);
+            state.UpdateDataFromSubscription(result);
+
+            if (!string.IsNullOrEmpty(resultRid))
+            {
+                await protocolClient.SendCommand("unsubscribe", resultRid);
+            }
+        }
+
+        public async Task<TokenModel> AuthForModel<T>(string rid, string method, object param, Action<T> initial, Action<T> changed)
+        {
+            var result = await Execute("auth", rid, method, param);
+            state.CheckForErrors(result);
+
+            var resultRid = state.GetRidFromCmd(result);
+            if (string.IsNullOrEmpty(resultRid))
+                return null;
+
+            var token = new TokenModel(this, resultRid, data =>
+            {
+                initial?.Invoke(data.ToObject<T>());
+            }, data =>
+            {
+                changed?.Invoke(data.ToObject<T>());
+            });
+            lock (subscriptionModel)
+            {
+                subscriptionModel.Add(token, resultRid);
+            }
+
+            state.UpdateDataFromSubscription(result);
+
+            return token;
+        }
+
+        public async Task<TokenCollection> AuthForCollection<T>(string rid, string method, object param, Action<List<T>> initial,
+            Action<int, T> added, Action<int, T> changed, Action<int> removed)
+        {
+            var result = await Execute("auth", rid, method, param);
+            state.CheckForErrors(result);
+
+            var resultRid = state.GetRidFromCmd(result);
+            if (string.IsNullOrEmpty(resultRid))
+                return null;
+
+            var token = new TokenCollection(this, rid, (list) =>
+            {
+                initial?.Invoke(list.Select(x => x.ToObject<T>()).ToList());
+            }, (idx, data) =>
+            {
+                added?.Invoke(idx, data.ToObject<T>());
+            }, (idx, data) =>
+            {
+                changed?.Invoke(idx, data.ToObject<T>());
+            }, (idx) => { removed?.Invoke(idx); });
+
+            lock (subscriptionCollection)
+            {
+                subscriptionCollection.Add(token, resultRid);
+            }
+
+            state.UpdateDataFromSubscription(result);
+
+            return token;
+        }
+
+        public async Task<JToken> AuthForRawPayload(string rid, string method, object param)
+        {
+            var result = await Execute("auth", rid, method, param);
+            state.CheckForErrors(result);
+            return state.GetPayload(result);
+        }
+
+        public async Task<string> AuthForStringPayload(string rid, string method, object param)
+        {
+            var token = await AuthForRawPayload(rid, method, param);
+            return JsonConvert.SerializeObject(token, Formatting.None);
+        }
+
+        public async Task<T> AuthForPayload<T>(string rid, string method, object param)
+        {
+            var token = await AuthForRawPayload(rid, method, param);
             return token.ToObject<T>();
         }
 

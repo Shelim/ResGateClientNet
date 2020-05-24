@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading.Tasks;
 using Newtonsoft.Json.Linq;
 
 namespace Resgate
@@ -41,6 +42,23 @@ namespace Resgate
             Changed = changed;
             Removed = removed;
         }
+        public void Dispose()
+        {
+            client.UnsubscribeToken(this);
+        }
+    }
+
+    public sealed class TokenReconnected : IDisposable
+    {
+        private readonly Client client;
+        internal readonly Func<Task> Reconnected;
+
+        internal TokenReconnected(Client client, Func<Task> reconnected)
+        {
+            this.client = client;
+            Reconnected = reconnected;
+        }
+
         public void Dispose()
         {
             client.UnsubscribeToken(this);

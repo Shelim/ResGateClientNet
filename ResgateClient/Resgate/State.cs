@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Resgate.Resgate;
 using Resgate.Utility;
 
 namespace Resgate
@@ -84,7 +85,7 @@ namespace Resgate
 
         private readonly Dictionary<string, List<JToken>> collections = new Dictionary<string, List<JToken>>();
 
-        public string GetRidFromCall(string data)
+        public string GetRidFromCmd(string data)
         {
             var parsed = JsonConvert.DeserializeObject<DataContainer>(data);
             
@@ -95,6 +96,15 @@ namespace Resgate
             var parsed = JsonConvert.DeserializeObject<DataContainer>(data);
 
             return parsed.Result.Payload;
+        }
+
+        public void CheckForErrors(string data)
+        {
+            var parsed = JsonConvert.DeserializeObject<DataContainer>(data);
+            if (parsed.Error != null)
+            {
+                throw new ErrorException(parsed.Error.Code, parsed.Error.Message, parsed.Error.Data);
+            }
         }
 
         public void UpdateDataFromSubscription(string data)
@@ -515,6 +525,14 @@ namespace Resgate
         private sealed class DataContainer
         {
             [JsonProperty("result")] public Data Result;
+            [JsonProperty("error")] public Error Error;
+        }
+
+        private class Error
+        {
+            [JsonProperty("code")] public string Code;
+            [JsonProperty("message")] public string Message;
+            [JsonProperty("data")] public JToken Data;
         }
 
         private class Data

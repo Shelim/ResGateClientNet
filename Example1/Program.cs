@@ -24,6 +24,11 @@ namespace Example1
                 Console.WriteLine("Failed to connect due to " + ev.Reason.ToString());
                 waitForInitial.Set();
             };
+            settings.Error += (sender, eventArgs) =>
+            {
+                Console.WriteLine("Failed to subscribe " + eventArgs.Rid + " because of " +
+                                  eventArgs.Error.Message);
+            };
 
             using (var client = new Resgate.Client(settings))
             {
@@ -62,8 +67,6 @@ namespace Example1
                 Console.WriteLine("________________");
                 Console.WriteLine("What do you want to do next?");
                 Console.WriteLine("(A)dd book");
-                Console.WriteLine("(E)dit book");
-                Console.WriteLine("(D)elete book");
                 Console.WriteLine("(Q)uit");
                 Console.WriteLine("________________");
             }

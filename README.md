@@ -6,9 +6,7 @@ Very liberal license, MIT
 
 No credit (in binary form) is required
 
-(Will amend this readme later on)
-
-## Examples
+## Basics
 
 Subscriber model is based on idea of tokens. You will get `IDisposable` token
 each time you subscribe to any resource. As long as this token is not disposed
@@ -21,8 +19,13 @@ Requires Newtonsoft.JSON and WebSocket.Client
 
 Requires ResGate version at least 1.2.0
 
+## Examples
+
 EXAMPLE 1.
-Run [this server app](https://github.com/resgateio/resgate/tree/master/examples/book-collection)
+Run [this server app](https://github.com/resgateio/resgate/tree/master/examples/book-collection) - Book Collection
+
+EXAMPLE 2.
+Run [this server app](https://github.com/resgateio/resgate/tree/master/examples/password-authentication) - Password Authentication
 
 ## Roadmap
 
@@ -34,7 +37,9 @@ Last updated: May, 22nd, 2020
  - [x] ~~Get methods~~
  - [x] ~~Subscribe and unsubscribe methods~~
  - [x] ~~Call methods~~
- - [ ] Auth methods
+ - [x] ~~Auth methods~~
+ - [x] ~~Error handling~~
+ - [x] ~~Re-auth on reconnect (or anything else, actually)~~
  - [ ] First release on nugets
 
 ## API
@@ -55,6 +60,15 @@ var settings = new Resgate.Settings(() => new Uri("ws://localhost:8080"));
 settings.Failed += (o, ev) =>
 {
     Console.WriteLine("Failed to connect due to " + ev.Reason.ToString());
+}
+
+// If there is a problem with subscribe request, it will be reported here
+// (as subscription must be re-applied every new reconnection after
+// connection has been lost)
+settings.Error += (obj, evnt) =>
+{
+	Console.WriteLine("Failed to subscribe " + evnt.Rid + " because of " +
+					  evnt.Error.Message);
 }
 
 // Define class that will hold our data. You can have subobjects, and they will
@@ -119,6 +133,35 @@ using (var client = new Resgate.Client(settings))
     
     // The same, but payload as deserialized object:
     Book payloadBook = await client.CallForPayload<Book>("library.books", "method", new[] { "Sample" } );
+	
+	// Auth methods contain the same variants as call methods, but beware - in case of reconnection
+	// they must be called again (protocol is stateless between connections!)
+	
+	// Therefore you can use this trick:
+
+	TokenReconnected tokenAuth = null;
+	bool isAuthenticated = false;
+	
+	for (;;)
+	{
+		Console.WriteLine("Enter password:");
+		string pwd = Console.ReadLine();
+		tokenAuth?.Dispose();
+		tokenAuth = await client.AuthAction(async () =>
+		{
+			isAuthenticated = false;
+			try
+			{
+				await client.Auth("passwd", "login", new Auth {password = pwd});
+				isAuthenticated = true;
+			}
+			catch (ErrorException error)
+			{
+				Console.WriteLine("Server returned error code: " + error.Message);
+			}
+		});
+		if (isAuthenticated) break;
+	}
 }
 
 List<Book> data;

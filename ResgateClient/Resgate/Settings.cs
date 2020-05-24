@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 using Resgate.Protocol;
+using Resgate.Resgate;
 
 namespace Resgate
 {
@@ -12,11 +13,17 @@ namespace Resgate
         public readonly TimeSpan ResponseTimeout;
 
         public event EventHandler<FailedEventArgs> Failed;
+        public event EventHandler<ErrorEventArgs> Error;
 
         internal void InvokeFailed(Client client, FailedEventArgs.FailedReason reason)
         {
             Failed?.Invoke(client, new FailedEventArgs(reason));
         }
+        internal void InvokeError(Client client, string rid, ErrorException error)
+        {
+            Error?.Invoke(client, new ErrorEventArgs(rid, error));
+        }
+
 
         public Settings(Func<Uri> uriProvider)
         {
