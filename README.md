@@ -67,8 +67,8 @@ settings.Failed += (o, ev) =>
 // connection has been lost)
 settings.Error += (obj, evnt) =>
 {
-	Console.WriteLine("Failed to subscribe " + evnt.Rid + " because of " +
-					  evnt.Error.Message);
+    Console.WriteLine("Failed to subscribe " + evnt.Rid + " because of " +
+                      evnt.Error.Message);
 }
 
 // Define class that will hold our data. You can have subobjects, and they will
@@ -133,35 +133,41 @@ using (var client = new Resgate.Client(settings))
     
     // The same, but payload as deserialized object:
     Book payloadBook = await client.CallForPayload<Book>("library.books", "method", new[] { "Sample" } );
-	
-	// Auth methods contain the same variants as call methods, but beware - in case of reconnection
-	// they must be called again (protocol is stateless between connections!)
-	
-	// Therefore you can use this trick:
+    
+    // Auth methods contain the same variants as call methods, but beware - in case of reconnection
+    // they must be called again (protocol is stateless between connections!)
+    
+    // Therefore you can use this trick:
 
-	TokenReconnected tokenAuth = null;
-	bool isAuthenticated = false;
-	
-	for (;;)
-	{
-		Console.WriteLine("Enter password:");
-		string pwd = Console.ReadLine();
-		tokenAuth?.Dispose();
-		tokenAuth = await client.AuthAction(async () =>
-		{
-			isAuthenticated = false;
-			try
-			{
-				await client.Auth("passwd", "login", new Auth {password = pwd});
-				isAuthenticated = true;
-			}
-			catch (ErrorException error)
-			{
-				Console.WriteLine("Server returned error code: " + error.Message);
-			}
-		});
-		if (isAuthenticated) break;
-	}
+    TokenReconnected tokenAuth = null;
+    bool isAuthenticated = false;
+    
+    for (;;)
+    {
+        Console.WriteLine("Enter password:");
+        string pwd = Console.ReadLine();
+        tokenAuth?.Dispose();
+        tokenAuth = await client.AuthAction(async () =>
+        {
+            isAuthenticated = false;
+            try
+            {
+                await client.Auth("passwd", "login", new Auth {password = pwd});
+                isAuthenticated = true;
+            }
+            catch (ErrorException error)
+            {
+                Console.WriteLine("Server returned error code: " + error.Message);
+            }
+        });
+        if (isAuthenticated) break;
+    }
+    // Logout after pressing a key
+    Console.ReadKey(true);
+    tokenAuth?.Dispose();
+    tokenAuth = null;
+    isAuthenticated = false;
+    await client.Auth("passwd", "logout", null);
 }
 
 List<Book> data;
