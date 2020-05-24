@@ -29,7 +29,7 @@ Run [this server app](https://github.com/resgateio/resgate/tree/master/examples/
 
 ## Roadmap
 
-Last updated: May, 22nd, 2020
+Last updated: May, 24th, 2020
 
 ### ToDo
 
